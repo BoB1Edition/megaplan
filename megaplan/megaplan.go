@@ -47,40 +47,6 @@ type Responce struct {
 	Data   interface{} `json:"data"`
 }
 
-type ResponceObjects struct {
-	Status status        `json:"status"`
-	Data   []interface{} `json:"data"`
-}
-
-type Event struct {
-	Id               int
-	Description      string
-	Name             string
-	TimeCreated      time.Time
-	StartTime        time.Time
-	Duration         int
-	IsPersonal       bool
-	EventCategory    string
-	Participants     interface{}
-	Contractors      interface{}
-	Reminders        interface{}
-	HasTodo          bool
-	HasCommunication bool
-	TodoLisId        int
-	Position         int
-	Owner            int
-	IsFinished       bool
-	Place            string
-	IsFavorite       bool
-	TimeUpdated      time.Time
-	CanEdit          bool
-	IsOverdue        bool
-}
-
-type Events struct {
-	Events []Event
-}
-
 func getMD5Hash(text string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(text))
@@ -92,20 +58,21 @@ func (m *Megaplan) ConnectMegaplan(URL, Login, Password string) error {
 	params := url.Values{}
 	params.Set("Login", Login)
 	params.Set("Password", getMD5Hash(Password))
-	resp, err := m.do(authURL, params)
+	auth := auths{}
+	resp, err := m.do(authURL, params, &auth)
 	if err != nil {
 		return err
 	}
 	jresp := resp
 
-	auth := jresp.Data.(map[string]interface{})
-	//fmt.Println("jresp: ", jresp.Data)
-	m.accessId = auth["AccessId"].(string)
-	m.secretKey = auth["SecretKey"].(string)
+	//auth := jresp.Data.(map[string]interface{})
+	fmt.Println("jresp: ", jresp.Data)
+	m.accessId = auth.AccessId   //["AccessId"].(string)
+	m.secretKey = auth.SecretKey //["SecretKey"].(string)
 	return nil
 }
 
-func (m *Megaplan) ListEvent(TodoListId int, Limit int, Offset int, OnlyActual bool, Search string) Responce {
+func (m *Megaplan) ListEvent(TodoListId int, Limit int, Offset int, OnlyActual bool, Search string) []Event {
 	param := url.Values{}
 	if TodoListId != 0 {
 		param.Add("TodoListId", string(TodoListId))
@@ -113,30 +80,26 @@ func (m *Megaplan) ListEvent(TodoListId int, Limit int, Offset int, OnlyActual b
 	param.Add("Limit", strconv.Itoa(Limit))
 	param.Add("Offset", strconv.Itoa(Offset))
 	param.Add("OnlyActual", strconv.FormatBool(OnlyActual))
-	jresp, err := m.do(listEventURL, param)
+	events := []Event{}
+	_, err := m.do(listEventURL, param, &events)
 	//jresp := resp
 	if err != nil {
-		return jresp
+		fmt.Println("err: ", err)
+		return events
 	}
-	fmt.Println("status", jresp.Status)
-	//fmt.Println("jresp.data", jresp.Data)
-	return jresp
+	//fmt.Println("status", jresp.Status)
+	//fmt.Println("jresp.data", events)
+	return events
 }
 
-func (m *Megaplan) doList(URL string, param url.Values) (ResponceObjects, error) {
-	jresp := ResponceObjects{}
-	bodyText := m.dorun(URL, param)
-	err := json.Unmarshal(bodyText, &jresp)
-	if err != nil {
-		return jresp, err
-	}
-	return jresp, nil
-}
-
-func (m *Megaplan) do(URL string, param url.Values) (Responce, error) {
+func (m *Megaplan) do(URL string, param url.Values, pinterface interface{}) (Responce, error) {
 	jresp := Responce{}
+	jresp.Data = pinterface
 	bodyText := m.dorun(URL, param)
 	err := json.Unmarshal(bodyText, &jresp)
+	fmt.Println("---------------------------------------------------------------")
+	fmt.Println(string(bodyText[:]))
+	fmt.Println("---------------------------------------------------------------")
 	if err != nil {
 		return jresp, err
 	}
@@ -173,15 +136,16 @@ func (m *Megaplan) dorun(URL string, param url.Values) []byte {
 	}
 	defer resp.Body.Close()
 	bodyText, err := ioutil.ReadAll(resp.Body)
-	//fmt.Println("-------------------------------------------------------")
-	//fmt.Println("bodyText: ", string(bodyText[:]))
-	//fmt.Println("-------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------")
+	fmt.Println("bodyText: ", string(bodyText))
+	fmt.Println("-------------------------------------------------------")
 	return bodyText
 
 }
 
 func (m *Megaplan) ListEventCategory() Responce {
-	jresp, err := m.do(listEventCategoryURL, nil)
+	cat := map[string]string{}
+	jresp, err := m.do(listEventCategoryURL, nil, &cat)
 	if err != nil {
 		return jresp
 	}
