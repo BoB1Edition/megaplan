@@ -1,5 +1,7 @@
 package megaplan
 
+type Employees map[int]Employee
+
 type Position struct {
 	Id   int
 	Name string

@@ -20,6 +20,7 @@ const (
 	authURL              = "/BumsCommonApiV01/User/authorize.api"
 	listEventURL         = "/BumsTimeApiV01/Event/list.api"
 	listEventCategoryURL = "/BumsTimeApiV01/Event/categories.api"
+	cardEmployee         = "/BumsStaffApiV01/Employee/card.api"
 )
 
 type Megaplan struct {
@@ -97,9 +98,9 @@ func (m *Megaplan) do(URL string, param url.Values, pinterface interface{}) (Res
 	jresp.Data = pinterface
 	bodyText := m.dorun(URL, param)
 	err := json.Unmarshal(bodyText, &jresp)
-	fmt.Println("---------------------------------------------------------------")
+	/*fmt.Println("---------------------------------------------------------------")
 	fmt.Println(string(bodyText[:]))
-	fmt.Println("---------------------------------------------------------------")
+	fmt.Println("---------------------------------------------------------------")*/
 	if err != nil {
 		return jresp, err
 	}
@@ -166,6 +167,18 @@ func getSignature(input, key string) string {
 	s := hex.EncodeToString(h.Sum(nil))
 	signature := base64.StdEncoding.EncodeToString([]byte(s))
 	return signature
+}
+
+func (m *Megaplan) GetCardEmployee(id int) Employee {
+	param := url.Values{}
+	param.Add("Id", string(id))
+	employee := Employee{}
+	_, err := m.do(cardEmployee, param, &employee)
+	//jresp := resp
+	if err != nil {
+		fmt.Println("err: ", err)
+	}
+	return employee
 }
 
 func Test() {
