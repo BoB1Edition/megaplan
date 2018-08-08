@@ -1,6 +1,8 @@
 package megaplan
 
-type Employees map[int]Employee
+type Employees struct {
+	Employees []Employee `json:"employees"`
+}
 
 type Position struct {
 	Id   int
@@ -35,6 +37,7 @@ type Employee struct {
 	Inn          string
 	PassportData string
 	AboutMe      string
+	User         User
 	//ChiefsWithoutMe	array<object> (Id, Name)
 	//SubordinatesWithoutMe	array<object> (Id, Name)
 	//Coordinators	array<object> (Id, Name)
@@ -49,4 +52,27 @@ type Employee struct {
 	LastOnline          string
 	IsOnline            bool
 	UnreadCommentsCount int
+}
+
+type User struct {
+	Id   int
+	Name string
+}
+
+func (es *Employees) GetOwnerInfo(id int) Employee {
+	for _, e := range es.Employees {
+		if e.User.Id == id {
+			return e
+		}
+	}
+	return Employee{}
+}
+
+func (es *Employees) GetParticipantInfo(id int) Employee {
+	for _, e := range es.Employees {
+		if e.Id == id {
+			return e
+		}
+	}
+	return Employee{}
 }

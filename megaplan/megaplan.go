@@ -21,6 +21,11 @@ const (
 	listEventURL         = "/BumsTimeApiV01/Event/list.api"
 	listEventCategoryURL = "/BumsTimeApiV01/Event/categories.api"
 	cardEmployee         = "/BumsStaffApiV01/Employee/card.api"
+	listEmployeeURL      = "/BumsStaffApiV01/Employee/list.api"
+	listClientURL        = "/BumsCrmApiV01/Contractor/list.api"
+	listFieldsURL        = "/BumsCrmApiV01/Contractor/listFields.api"
+	cardContactorURL     = "/BumsCrmApiV01/Contractor/card.api"
+	updateEventURL       = "/BumsTimeApiV01/Event/update.api"
 )
 
 type Megaplan struct {
@@ -28,6 +33,13 @@ type Megaplan struct {
 	accessId  string
 	secretKey string
 	client    *http.Client
+}
+
+type Categorie struct {
+	Categories []struct {
+		ID   int    `json:"Id"`
+		Name string `json:"Name"`
+	} `json:"categories"`
 }
 
 type auths struct {
@@ -60,14 +72,14 @@ func (m *Megaplan) ConnectMegaplan(URL, Login, Password string) error {
 	params.Set("Login", Login)
 	params.Set("Password", getMD5Hash(Password))
 	auth := auths{}
-	resp, err := m.do(authURL, params, &auth)
+	_, err := m.do(authURL, params, &auth)
 	if err != nil {
 		return err
 	}
-	jresp := resp
+	//jresp := resp
 
 	//auth := jresp.Data.(map[string]interface{})
-	fmt.Println("jresp: ", jresp.Data)
+	//fmt.Println("jresp: ", jresp.Data)
 	m.accessId = auth.AccessId   //["AccessId"].(string)
 	m.secretKey = auth.SecretKey //["SecretKey"].(string)
 	return nil
@@ -98,9 +110,9 @@ func (m *Megaplan) do(URL string, param url.Values, pinterface interface{}) (Res
 	jresp.Data = pinterface
 	bodyText := m.dorun(URL, param)
 	err := json.Unmarshal(bodyText, &jresp)
-	/*fmt.Println("---------------------------------------------------------------")
-	fmt.Println(string(bodyText[:]))
-	fmt.Println("---------------------------------------------------------------")*/
+	//fmt.Println("---------------------------------------------------------------")
+	//fmt.Println(string(bodyText[:]))
+	//fmt.Println("---------------------------------------------------------------")
 	if err != nil {
 		return jresp, err
 	}
@@ -119,7 +131,7 @@ func (m *Megaplan) dorun(URL string, param url.Values) []byte {
 	if param != nil {
 		quest += "?" + param.Encode()
 	}
-	fmt.Println(quest)
+	//fmt.Println(quest)
 	req, err := http.NewRequest("GET", "https://"+quest, nil)
 	//fmt.Println("quest: ", quest)
 
@@ -137,20 +149,20 @@ func (m *Megaplan) dorun(URL string, param url.Values) []byte {
 	}
 	defer resp.Body.Close()
 	bodyText, err := ioutil.ReadAll(resp.Body)
-	fmt.Println("-------------------------------------------------------")
-	fmt.Println("bodyText: ", string(bodyText))
-	fmt.Println("-------------------------------------------------------")
+	//fmt.Println("-------------------------------------------------------")
+	//fmt.Println("bodyText: ", string(bodyText))
+	//fmt.Println("-------------------------------------------------------")
 	return bodyText
 
 }
 
-func (m *Megaplan) ListEventCategory() Responce {
-	cat := map[string]string{}
-	jresp, err := m.do(listEventCategoryURL, nil, &cat)
+func (m *Megaplan) ListEventCategory() Categorie {
+	cat := Categorie{}
+	_, err := m.do(listEventCategoryURL, nil, &cat)
 	if err != nil {
-		return jresp
+		return cat
 	}
-	return jresp
+	return cat
 }
 
 func (m *Megaplan) createSignature(URL, Date string) string {
@@ -171,7 +183,7 @@ func getSignature(input, key string) string {
 
 func (m *Megaplan) GetCardEmployee(id int) Employee {
 	param := url.Values{}
-	param.Add("Id", string(id))
+	param.Add("Id", strconv.Itoa(id))
 	employee := Employee{}
 	_, err := m.do(cardEmployee, param, &employee)
 	//jresp := resp
@@ -181,14 +193,65 @@ func (m *Megaplan) GetCardEmployee(id int) Employee {
 	return employee
 }
 
-func Test() {
-	Sign := "GET\n\n\nTue, 09 Dec 2014 10:29:11 +0300\nexample.megatest.local/BumsCrmApiV01/Contractor/list.api?FilterId=all&Limit=1&Phone=1"
-	SecretKey := "fd57A98113F7Eb562e34F5Fa1c1fDc362dbdE103"
-	Hash := "NzQzMGZkMGI1OWYyZTQyNGMzMWVhZTMxMDBiZTk2ODRlMGM3ZTY3NQ=="
-	MySign := getSignature(Sign, SecretKey)
-	current_time := time.Now().Local()
-	rfc := current_time.Format("Mon, 02 Jan 2006 15:04:05 -0700")
-	fmt.Println("rfc:   ", rfc)
-	fmt.Println("Hash:   ", Hash)
-	fmt.Println("MySign: ", MySign)
+func (m *Megaplan) ListEmployee(Department int, OrderBy string, TimeUpdated string, Name string) Employees {
+	param := url.Values{}
+	param.Add("Department", strconv.Itoa(Department))
+	employee := Employees{}
+	_, err := m.do(listEmployeeURL, param, &employee)
+	if err != nil {
+		fmt.Println("employee err: ", err)
+		return employee
+	}
+	return employee
+}
+
+func (m *Megaplan) ListClient(Department int, OrderBy string, TimeUpdated string, Name string) Clients {
+	param := url.Values{}
+	//param.Add("Limit", strconv.Itoa(10))
+	//param.Add("qs", "Глобальный")
+	clients := Clients{}
+	//clients := Responce{}
+	_, err := m.do(listClientURL, param, &clients)
+	if err != nil {
+		fmt.Println("employee err: ", err)
+		return clients
+	}
+	return clients
+}
+
+func (m *Megaplan) ListFields() ClientFields {
+	cat := ClientFields{}
+	_, err := m.do(listFieldsURL, nil, &cat)
+	if err != nil {
+		return cat
+	}
+	return cat
+}
+
+func (m *Megaplan) GetCardContactor(id int) ClientContractor {
+	param := url.Values{}
+	param.Add("Id", strconv.Itoa(id))
+	param.Add("RequestedFields[Category183CustomFieldLokalniyGlobalniy][0]", "Value")
+	contactor := ClientContractor{}
+	_, err := m.do(cardContactorURL, param, &contactor)
+	//jresp := resp
+	if err != nil {
+		fmt.Println("err: ", err)
+	}
+	return contactor
+}
+
+func (m *Megaplan) AddContractor(EventId int, ContactorIds ...int) error {
+	param := url.Values{}
+	param.Add("Id", strconv.Itoa(EventId))
+	for key, ContactorId := range ContactorIds {
+		param.Add("Model[Participants]["+strconv.Itoa(key)+"]", strconv.Itoa(ContactorId))
+	}
+	resp := Responce{}
+	_, err := m.do(updateEventURL, param, &resp)
+	if err != nil {
+		fmt.Println("err: ", err)
+		return err
+	}
+	return err
 }
