@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"megaplan"
+	"os"
+	"strconv"
 	"time"
 	"xlsWrite"
 
@@ -14,6 +18,13 @@ import (
 const (
 	limit = 100
 )
+
+type emailSettings struct {
+	From   string   `json:"From"`
+	Port   int      `json:"Port"`
+	Server string   `json:"Server"`
+	To     []string `json:"To"`
+}
 
 type AnswerStruct struct {
 	Name        string
@@ -27,7 +38,7 @@ type AnswerStruct struct {
 
 func main() {
 	meg := megaplan.Megaplan{}
-	err := meg.ConnectMegaplan("https://megaplan.ath.ru", "bob_edition@mail.ru", "zaq12wsx#")
+	err := meg.ConnectMegaplan("https://megaplan", "email", "password")
 	if err != nil {
 		fmt.Println("err: ", err)
 		return
@@ -51,8 +62,7 @@ func main() {
 		} else {
 			fmt.Println("Not odd")
 		}
-	}
-	*/
+	}*/
 	offset := 0
 	employee := meg.ListEmployee(0, "", "", "")
 	e := megaplan.Events{}
@@ -68,22 +78,31 @@ func main() {
 	}
 	ev := e.Filter(filtered)
 	createXls(ev, &meg, &employee)
-	m := email.NewMessage("Hi", "this is the body")
-	m.From = "megaplan_report@ath.ru"
-	m.To = []string{"azhokhov@ath.ru"}
-
-	err := m.Attach("report.xlsx")
+	t := time.Now()
+	mo := t.Month()
+	m := email.NewMessage("report for"+mo.String()+"/"+strconv.Itoa(t.Year()), "this test report<br>Please check this\nthanks :*")
+	esett := emailSettings{}
+	file, err := ioutil.ReadFile("./config.json")
+	if err != nil {
+		fmt.Printf("File error: %v\n", e)
+		os.Exit(1)
+	}
+	json.Unmarshal(file, &esett)
+	m.From.Address = esett.From
+	m.To = esett.To
+	err = m.Attach("report.xlsx")
 	if err != nil {
 		log.Println(err)
 	}
 
-	err = email.Send("srvmail-exim1.ath.ru", nil, m)
+	err = email.Send(esett.Server+":"+strconv.Itoa(esett.Port), nil, m)
 	if err != nil {
 		log.Println(err)
 	}
 }
 
 func createXls(events megaplan.Events, meg *megaplan.Megaplan, employee *megaplan.Employees) {
+	var callSales, callCGM, meetingSales, meetingCGM int
 	file := xlsx.NewFile()
 	defer file.Save("report.xlsx")
 	sales, err := file.AddSheet("Sales")
@@ -111,11 +130,13 @@ func createXls(events megaplan.Events, meg *megaplan.Megaplan, employee *megapla
 				dt := write(&event, meg, &owner)
 				fmt.Println("Встреча: ", dt)
 				WriteSlise(meeting, dt)
+				meetingCGM += 1
 			}
 			if event.EventCategory == "Звонок" {
 				dt := write(&event, meg, &owner)
 				fmt.Println("Звонок: ", dt)
 				WriteSlise(call, dt)
+				callCGM += 1
 			}
 			file.Save("report.xlsx")
 		}
@@ -126,11 +147,13 @@ func createXls(events megaplan.Events, meg *megaplan.Megaplan, employee *megapla
 				dt := write(&event, meg, &owner)
 				fmt.Println("Встреча: ", dt)
 				WriteSlise(meeting, dt)
+				meetingSales += 1
 			}
 			if event.EventCategory == "Звонок" {
 				dt := write(&event, meg, &owner)
 				fmt.Println("Звонок: ", dt)
 				WriteSlise(call, dt)
+				callSales += 1
 			}
 			file.Save("report.xlsx")
 		}
@@ -140,10 +163,12 @@ func createXls(events megaplan.Events, meg *megaplan.Megaplan, employee *megapla
 				if event.EventCategory == "Встреча" {
 					dt := write(&event, meg, &participant)
 					WriteSlise(meeting, dt)
+					meetingCGM += 1
 				}
 				if owner.Department.Name == "Звонок" {
 					dt := write(&event, meg, &participant)
 					WriteSlise(call, dt)
+					callCGM += 1
 				}
 				dt := write(&event, meg, &participant)
 				WriteSlise(cgm, dt)
@@ -152,10 +177,12 @@ func createXls(events megaplan.Events, meg *megaplan.Megaplan, employee *megapla
 				if event.EventCategory == "Встреча" {
 					dt := write(&event, meg, &participant)
 					WriteSlise(meeting, dt)
+					meetingSales += 1
 				}
 				if owner.Department.Name == "Звонок" {
 					dt := write(&event, meg, &participant)
 					WriteSlise(call, dt)
+					callSales += 1
 				}
 				dt := write(&event, meg, &participant)
 				WriteSlise(sales, dt)
@@ -163,23 +190,69 @@ func createXls(events megaplan.Events, meg *megaplan.Megaplan, employee *megapla
 			file.Save("report.xlsx")
 		}
 	}
+	total, err := file.AddSheet("Итоги")
+	if err != nil {
+		fmt.Println(err)
+	}
+	row := total.AddRow()
+	cell := row.AddCell()
+	cell.SetString("Итого встреч CGM")
+	cell = row.AddCell()
+	cell.SetInt(meetingCGM)
+	row = total.AddRow()
+	cell = row.AddCell()
+	cell.SetString("Итого звонков CGM")
+	cell = row.AddCell()
+	cell.SetInt(callCGM)
+	row = total.AddRow()
+	cell = row.AddCell()
+	cell.SetString("Итого встреч Sales")
+	cell = row.AddCell()
+	cell.SetInt(meetingSales)
+	row = total.AddRow()
+	cell = row.AddCell()
+	cell.SetString("Итого звонков Sales")
+	cell = row.AddCell()
+	cell.SetInt(callSales)
+	row = total.AddRow()
+	cell = row.AddCell()
+	cell.SetString("Итого встреч CGM + Sales")
+	cell = row.AddCell()
+	cell.SetInt(meetingSales + meetingCGM)
+	row = total.AddRow()
+	cell = row.AddCell()
+	cell.SetString("Итого звонков CGM + Sales")
+	cell = row.AddCell()
+	cell.SetInt(callSales + callCGM)
+	row = total.AddRow()
+	cell = row.AddCell()
+	cell.SetString("Итого все активности по коммерческому блоку")
+	cell = row.AddCell()
+	cell.SetInt(callSales + callCGM + meetingCGM + meetingSales)
+
 	xlsWrite.All()
 }
 
 func filtered(e megaplan.Event) bool {
-	t := time.Time{}
+	start := time.Time{}
+	create := time.Time{}
 	now := time.Now()
 	var err error
 	if len(e.StartTime) < 26 {
-		t, err = time.Parse("2006-01-02 15:04:05", e.StartTime)
+		start, err = time.Parse("2006-01-02 15:04:05", e.StartTime)
 	} else {
-		t, err = time.Parse("2006-01-02 15:04:05 -07:00", e.StartTime)
+		start, err = time.Parse("2006-01-02 15:04:05 -07:00", e.StartTime)
+	}
+	if len(e.TimeCreated) < 26 {
+		create, err = time.Parse("2006-01-02 15:04:05", e.StartTime)
+	} else {
+		create, err = time.Parse("2006-01-02 15:04:05 -07:00", e.StartTime)
 	}
 	if err != nil {
 		fmt.Println("err: ", err)
 		return false
 	}
-	if int(t.Month()) == int(now.Month())-1 {
+	if (int(start.Month()) == int(now.Month())-1) || (int(create.Month()) == int(now.Month())-1) {
 		return true
 	} else {
 		return false
